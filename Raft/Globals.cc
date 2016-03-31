@@ -19,85 +19,26 @@
 #include "Core/Debug.h"
 #include "Core/StringUtil.h"
 #include "Protocol/Common.h"
+#include "Raft/Globals.h"
 #include "Raft/RaftConsensus.h"
 #include "RPC/Server.h"
-#include "Server/ClientService.h"
-#include "Server/ControlService.h"
-#include "Server/Globals.h"
-#include "Server/RaftService.h"
-#include "Server/StateMachine.h"
+
 
 namespace LogCabin {
-namespace Server {
-
-////////// Globals::SigIntHandler //////////
-
-Globals::ExitHandler::ExitHandler(
-        Event::Loop& eventLoop,
-        int signalNumber)
-    : Signal(signalNumber)
-    , eventLoop(eventLoop)
-{
-}
-
-void
-Globals::ExitHandler::handleSignalEvent()
-{
-    NOTICE("%s: shutting down", strsignal(signalNumber));
-    eventLoop.exit();
-}
-
-Globals::LogRotateHandler::LogRotateHandler(
-        Event::Loop& eventLoop,
-        int signalNumber)
-    : Signal(signalNumber)
-    , eventLoop(eventLoop)
-{
-}
-
-void
-Globals::LogRotateHandler::handleSignalEvent()
-{
-    NOTICE("%s: rotating logs", strsignal(signalNumber));
-    std::string error = Core::Debug::reopenLogFromFilename();
-    if (!error.empty()) {
-        PANIC("Failed to rotate log file: %s",
-              error.c_str());
-    }
-    NOTICE("%s: done rotating logs", strsignal(signalNumber));
-}
-
+namespace Raft {
 
 ////////// Globals //////////
 
 Globals::Globals()
     : config()
-    , serverStats(*this)
     , eventLoop()
-    , sigIntBlocker(SIGINT)
-    , sigTermBlocker(SIGTERM)
-    , sigUsr1Blocker(SIGUSR1)
-    , sigUsr2Blocker(SIGUSR2)
-    , sigIntHandler(eventLoop, SIGINT)
-    , sigIntMonitor(eventLoop, sigIntHandler)
-    , sigTermHandler(eventLoop, SIGTERM)
-    , sigTermMonitor(eventLoop, sigTermHandler)
-    , sigUsr2Handler(eventLoop, SIGUSR2)
-    , sigUsr2Monitor(eventLoop, sigUsr2Handler)
     , clusterUUID()
     , serverId(~0UL)
-    , raft()
-    , stateMachine()
-    , controlService()
-    , raftService()
-    , clientService()
-    , rpcServer()
 {
 }
 
 Globals::~Globals()
 {
-    serverStats.exit();
 }
 
 void
@@ -108,36 +49,15 @@ Globals::init()
         clusterUUID.set(uuid);
     serverId = config.read<uint64_t>("serverId");
     Core::Debug::processName = Core::StringUtil::format("%lu", serverId);
-    {
-        ServerStats::Lock serverStatsLock(serverStats);
-        serverStatsLock->set_server_id(serverId);
-    }
-    if (!controlService) {
-        controlService.reset(new ControlService(*this));
-    }
-
-    if (!raftService) {
-        raftService.reset(new RaftService(*this));
-    }
-
-    if (!clientService) {
-        clientService.reset(new ClientService(*this));
-    }
-
+    /*
     if (!rpcServer) {
         rpcServer.reset(new RPC::Server(eventLoop,
                                         Protocol::Common::MAX_MESSAGE_LENGTH));
 
         uint32_t maxThreads = config.read<uint16_t>("maxThreads", 16);
         namespace ServiceId = Protocol::Common::ServiceId;
-        rpcServer->registerService(ServiceId::CONTROL_SERVICE,
-                                   controlService,
-                                   maxThreads);
         rpcServer->registerService(ServiceId::RAFT_SERVICE,
                                    raftService,
-                                   maxThreads);
-        rpcServer->registerService(ServiceId::CLIENT_SERVICE,
-                                   clientService,
                                    maxThreads);
 
         std::string listenAddressesStr =
@@ -173,17 +93,7 @@ Globals::init()
     if (!stateMachine) {
         stateMachine.reset(new StateMachine(raft, config, *this));
     }
-
-    serverStats.enable();
-}
-
-void
-Globals::leaveSignalsBlocked()
-{
-    sigIntBlocker.leaveBlocked();
-    sigTermBlocker.leaveBlocked();
-    sigUsr1Blocker.leaveBlocked();
-    sigUsr2Blocker.leaveBlocked();
+    */
 }
 
 void
@@ -192,15 +102,5 @@ Globals::run()
     eventLoop.runForever();
 }
 
-void
-Globals::unblockAllSignals()
-{
-    sigIntBlocker.unblock();
-    sigTermBlocker.unblock();
-    sigUsr1Blocker.unblock();
-    sigUsr2Blocker.unblock();
-}
-
-
-} // namespace LogCabin::Server
+} // namespace LogCabin::Raft
 } // namespace LogCabin

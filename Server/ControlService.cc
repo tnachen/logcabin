@@ -17,10 +17,10 @@
 
 #include "build/Protocol/ServerControl.pb.h"
 #include "Core/Debug.h"
+#include "Raft/RaftConsensus.h"
 #include "RPC/ServerRPC.h"
 #include "Server/ControlService.h"
 #include "Server/Globals.h"
-#include "Server/RaftConsensus.h"
 #include "Server/StateMachine.h"
 
 namespace LogCabin {

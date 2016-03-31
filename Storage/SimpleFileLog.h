@@ -47,7 +47,7 @@ class SimpleFileLog : public Log {
     };
 
   public:
-    typedef Protocol::Raft::Entry Entry;
+    typedef Raft::Protocol::Entry Entry;
 
     explicit SimpleFileLog(const Storage::FilesystemUtil::File& parentDir);
     ~SimpleFileLog();

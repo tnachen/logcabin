@@ -22,9 +22,9 @@
 #include <unordered_map>
 
 #include "build/Protocol/Client.pb.h"
-#include "build/Protocol/Raft.pb.h"
 #include "build/Protocol/ServerStats.pb.h"
-#include "build/Server/SnapshotStats.pb.h"
+#include "build/Raft/Protocol/Raft.pb.h"
+#include "build/Raft/Protocol/SnapshotStats.pb.h"
 #include "Client/SessionManager.h"
 #include "Core/CompatAtomic.h"
 #include "Core/ConditionVariable.h"
@@ -35,8 +35,8 @@
 #include "Storage/Log.h"
 #include "Storage/SnapshotFile.h"
 
-#ifndef LOGCABIN_SERVER_RAFTCONSENSUS_H
-#define LOGCABIN_SERVER_RAFTCONSENSUS_H
+#ifndef LOGCABIN_RAFT_RAFTCONSENSUS_H
+#define LOGCABIN_RAFT_RAFTCONSENSUS_H
 
 namespace LogCabin {
 
@@ -48,7 +48,7 @@ namespace RPC {
 class ClientSession;
 }
 
-namespace Server {
+namespace Raft {
 
 // forward declaration
 class Globals;
@@ -170,7 +170,7 @@ class Server {
      * diagnostics.
      */
     virtual void
-    updatePeerStats(Protocol::ServerStats::Raft::Peer& peerStats,
+    updatePeerStats(LogCabin::Protocol::ServerStats_Raft_Peer& peerStats,
                     Core::Time::SteadyTimeConverter& time) const = 0;
 
     /**
@@ -235,7 +235,7 @@ class LocalServer : public Server {
     bool isCaughtUp() const;
     void scheduleHeartbeat();
     std::ostream& dumpToStream(std::ostream& os) const;
-    void updatePeerStats(Protocol::ServerStats::Raft::Peer& peerStats,
+    void updatePeerStats(LogCabin::Protocol::ServerStats_Raft_Peer& peerStats,
                          Core::Time::SteadyTimeConverter& time) const;
     RaftConsensus& consensus;
     /**
@@ -315,7 +315,7 @@ class Peer : public Server {
      *      See CallStatus.
      */
     CallStatus
-    callRPC(Protocol::Raft::OpCode opCode,
+    callRPC(Raft::Protocol::OpCode opCode,
             const google::protobuf::Message& request,
             google::protobuf::Message& response,
             std::unique_lock<Mutex>& lockGuard);
@@ -329,7 +329,7 @@ class Peer : public Server {
      */
     void startThread(std::shared_ptr<Peer> self);
     std::ostream& dumpToStream(std::ostream& os) const;
-    void updatePeerStats(Protocol::ServerStats::Raft::Peer& peerStats,
+    void updatePeerStats(LogCabin::Protocol::ServerStats::Raft::Peer& peerStats,
                          Core::Time::SteadyTimeConverter& time) const;
 
   private:
@@ -598,7 +598,7 @@ class Configuration {
      */
     void setConfiguration(
             uint64_t newId,
-            const Protocol::Raft::Configuration& newDescription);
+            const Raft::Protocol::Configuration& newDescription);
 
     /**
      * Add servers that are to mirror the log but that may not have a vote
@@ -608,7 +608,7 @@ class Configuration {
      * should probably have three sets, as john said.
      */
     void setStagingServers(
-            const Protocol::Raft::SimpleConfiguration& stagingServers);
+	    const Raft::Protocol::SimpleConfiguration& stagingServers);
 
     /**
      * Return true if every server in the staging set satisfies the predicate,
@@ -628,7 +628,7 @@ class Configuration {
      * Write the configuration servers' state into the given structure. Used
      * for diagnostics.
      */
-    void updateServerStats(Protocol::ServerStats& serverStats,
+    void updateServerStats(LogCabin::Protocol::ServerStats& serverStats,
                            Core::Time::SteadyTimeConverter& time) const;
 
     /**
@@ -682,11 +682,11 @@ class Configuration {
     /**
      * A description of the current configuration.
      */
-    Protocol::Raft::Configuration description;
+    Raft::Protocol::Configuration description;
 
   private:
     /**
-     * A majority of these servers are necessary for a quorum under 
+     * A majority of these servers are necessary for a quorum under
      * STABLE, STAGING, and TRANSITIONAL configurations. (Under TRANSITIONAL, a
      * majority of newServers is also needed.)
      */
@@ -728,7 +728,7 @@ class ConfigurationManager {
      *      The serializable representation of the configuration.
      */
     void add(uint64_t index,
-             const Protocol::Raft::Configuration& description);
+             const Raft::Protocol::Configuration& description);
     /**
      * Called when a log prefix is truncated (after saving a snapshot that
      * covers this prefix).
@@ -753,7 +753,7 @@ class ConfigurationManager {
      *      The serializable representation of the configuration.
      */
     void setSnapshot(uint64_t index,
-                     const Protocol::Raft::Configuration& description);
+                     const Raft::Protocol::Configuration& description);
 
     /**
      * Return the configuration as of a particular log index.
@@ -764,7 +764,7 @@ class ConfigurationManager {
      *      The index and description of the configuration with the largest
      *      index in the range [1, lastIncludedIndex].
      */
-    std::pair<uint64_t, Protocol::Raft::Configuration>
+    std::pair<uint64_t, Raft::Protocol::Configuration>
     getLatestConfigurationAsOf(uint64_t lastIncludedIndex) const;
 
   private:
@@ -795,13 +795,13 @@ class ConfigurationManager {
      * The key is the entry ID where the configuration belongs in the log; the
      * value is the serializable form of the configuration.
      */
-    std::map<uint64_t, Protocol::Raft::Configuration> descriptions;
+    std::map<uint64_t, Raft::Protocol::Configuration> descriptions;
 
     /**
      * This reflects the configuration found in this server's latest snapshot,
      * or {0, {}} if this server has no snapshot.
      */
-    std::pair<uint64_t, Protocol::Raft::Configuration> snapshot;
+    std::pair<uint64_t, Raft::Protocol::Configuration> snapshot;
 
     friend class Invariants;
 };
@@ -1015,7 +1015,7 @@ class RaftConsensus {
      * configuration.
      */
     ClientResult getConfiguration(
-            Protocol::Raft::SimpleConfiguration& configuration,
+            Raft::Protocol::SimpleConfiguration& configuration,
             uint64_t& id) const;
 
     /**
@@ -1057,8 +1057,8 @@ class RaftConsensus {
      *      Where the reply should be placed.
      */
     void handleAppendEntries(
-                const Protocol::Raft::AppendEntries::Request& request,
-                Protocol::Raft::AppendEntries::Response& response);
+                const Raft::Protocol::AppendEntries::Request& request,
+                Raft::Protocol::AppendEntries::Response& response);
 
     /**
      * Process an InstallSnapshot RPC from another server. Called by
@@ -1069,8 +1069,8 @@ class RaftConsensus {
      *      Where the reply should be placed.
      */
     void handleInstallSnapshot(
-                const Protocol::Raft::InstallSnapshot::Request& request,
-                Protocol::Raft::InstallSnapshot::Response& response);
+                const Raft::Protocol::InstallSnapshot::Request& request,
+                Raft::Protocol::InstallSnapshot::Response& response);
 
     /**
      * Process a RequestVote RPC from another server. Called by RaftService.
@@ -1079,8 +1079,8 @@ class RaftConsensus {
      * \param[out] response
      *      Where the reply should be placed.
      */
-    void handleRequestVote(const Protocol::Raft::RequestVote::Request& request,
-                           Protocol::Raft::RequestVote::Response& response);
+    void handleRequestVote(const Raft::Protocol::RequestVote::Request& request,
+                           Raft::Protocol::RequestVote::Response& response);
 
     /**
      * Submit an operation to the replicated log.
@@ -1103,8 +1103,8 @@ class RaftConsensus {
      */
     ClientResult
     setConfiguration(
-            const Protocol::Client::SetConfiguration::Request& request,
-            Protocol::Client::SetConfiguration::Response& response);
+	    const LogCabin::Protocol::Client::SetConfiguration::Request& request,
+            LogCabin::Protocol::Client::SetConfiguration::Response& response);
 
     /**
      * Register which versions of client commands/behavior the local state
@@ -1154,7 +1154,7 @@ class RaftConsensus {
     /**
      * Add information about the consensus state to the given structure.
      */
-    void updateServerStats(Protocol::ServerStats& serverStats) const;
+    void updateServerStats(LogCabin::Protocol::ServerStats& serverStats) const;
 
     /**
      * Print out the contents of this class for debugging purposes.
@@ -1319,7 +1319,7 @@ class RaftConsensus {
      */
     uint64_t
     packEntries(uint64_t nextIndex,
-                Protocol::Raft::AppendEntries::Request& request) const;
+                Raft::Protocol::AppendEntries::Request& request) const;
 
     /**
      * Try to read the latest good snapshot from disk. Loads the header of the
@@ -1719,7 +1719,7 @@ class RaftConsensus {
     friend class RaftConsensusInternal::Invariants;
 };
 
-} // namespace LogCabin::Server
+} // namespace LogCabin::Raft
 } // namespace LogCabin
 
-#endif /* LOGCABIN_SERVER_RAFTCONSENSUS_H */
+#endif /* LOGCABIN_RAFT_RAFTCONSENSUS_H */

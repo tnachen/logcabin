@@ -33,12 +33,15 @@ namespace RPC {
 class Server;
 }
 
+namespace Raft {
+class RaftConsensus;
+}
+
 namespace Server {
 
 // forward declarations
 class ClientService;
 class ControlService;
-class RaftConsensus;
 class RaftService;
 class StateMachine;
 
@@ -199,7 +202,7 @@ class Globals {
     /**
      * Consensus module.
      */
-    std::shared_ptr<Server::RaftConsensus> raft;
+    std::shared_ptr<Raft::RaftConsensus> raft;
 
     /**
      * State machine used to process client requests.

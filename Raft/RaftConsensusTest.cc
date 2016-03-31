@@ -28,7 +28,7 @@
 #include "RPC/Address.h"
 #include "RPC/ServiceMock.h"
 #include "RPC/Server.h"
-#include "Server/RaftConsensus.h"
+#include "RaftConsensus/RaftConsensus.h"
 #include "Server/Globals.h"
 #include "Storage/MemoryLog.h"
 #include "Storage/SnapshotFile.h"

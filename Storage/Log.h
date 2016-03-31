@@ -17,7 +17,7 @@
 #include <memory>
 #include <vector>
 
-#include "build/Protocol/Raft.pb.h"
+#include "build/Raft/Protocol/Raft.pb.h"
 #include "build/Protocol/RaftLogMetadata.pb.h"
 
 #ifndef LOGCABIN_STORAGE_LOG_H
@@ -74,7 +74,7 @@ class Log {
     /**
      * The type of a log entry (the same format that's used in AppendEntries).
      */
-    typedef Protocol::Raft::Entry Entry;
+    typedef Raft::Protocol::Entry Entry;
 
     Log();
     virtual ~Log();

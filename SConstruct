@@ -231,6 +231,7 @@ SConscript('Core/SConscript', variant_dir='build/Core')
 SConscript('Event/SConscript', variant_dir='build/Event')
 SConscript('RPC/SConscript', variant_dir='build/RPC')
 SConscript('Protocol/SConscript', variant_dir='build/Protocol')
+SConscript('Raft/SConscript', variant_dir='build/Raft')
 SConscript('Tree/SConscript', variant_dir='build/Tree')
 SConscript('Client/SConscript', variant_dir='build/Client')
 SConscript('Storage/SConscript', variant_dir='build/Storage')
@@ -261,6 +262,7 @@ env.Default(clientlib)
 
 daemon = env.Program("build/LogCabin",
             (["build/Server/Main.cc"] +
+             object_files['Raft'] +
              object_files['Server'] +
              object_files['Storage'] +
              object_files['Tree'] +
@@ -275,7 +277,8 @@ env.Default(daemon)
 storageTool = env.Program("build/Storage/Tool",
             (["build/Storage/Tool.cc"] +
              [ # these proto files should maybe move into Protocol
-                "build/Server/SnapshotMetadata.pb.o",
+                "build/Raft/SnapshotMetadata.pb.o",
+                "build/Raft/Protocol/Raft.pb.o",
                 "build/Server/SnapshotStateMachine.pb.o",
              ] +
              object_files['Storage'] +

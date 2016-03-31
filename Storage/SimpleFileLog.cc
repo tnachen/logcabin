@@ -18,7 +18,7 @@
 #include <sys/stat.h>
 #include <unistd.h>
 
-#include "build/Protocol/Raft.pb.h"
+#include "build/Raft/Protocol/Raft.pb.h"
 #include "Core/Buffer.h"
 #include "Core/Checksum.h"
 #include "Core/Debug.h"
@@ -354,7 +354,7 @@ SimpleFileLog::getEntryIds() const
 Log::Entry
 SimpleFileLog::read(const std::string& entryPath) const
 {
-    Protocol::Raft::Entry entry;
+    Raft::Protocol::Entry entry;
     std::string error = fileToProto(dir, entryPath, entry);
     if (!error.empty())
         PANIC("Could not parse file: %s", error.c_str());

@@ -13,16 +13,14 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
-#include "RPC/Service.h"
-
-
 #include "build/Protocol/Client.pb.h"
-#include "build/Protocol/Raft.pb.h"
+#include "build/Raft/Protocol/Raft.pb.h"
 #include "Core/Debug.h"
 #include "Core/ProtoBuf.h"
 #include "RPC/ClientRPC.h"
-#include "Protocol/Common.h"
 #include "RPC/ClientSession.h"
+#include "RPC/Service.h"
+#include "Protocol/Common.h"
 
 #ifndef LOGCABIN_SERVER_CLIENTSERVICE_H
 #define LOGCABIN_SERVER_CLIENTSERVICE_H

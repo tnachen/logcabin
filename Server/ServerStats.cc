@@ -19,8 +19,8 @@
 #include "Core/ThreadId.h"
 #include "Core/Time.h"
 #include "Event/Signal.h"
+#include "Raft/RaftConsensus.h"
 #include "Server/Globals.h"
-#include "Server/RaftConsensus.h"
 #include "Server/StateMachine.h"
 #include "Server/ServerStats.h"
 

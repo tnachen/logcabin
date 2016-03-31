@@ -31,11 +31,15 @@
 #define LOGCABIN_SERVER_STATEMACHINE_H
 
 namespace LogCabin {
+
+namespace Raft {
+class RaftConsensus;
+}
+
 namespace Server {
 
 // forward declaration
 class Globals;
-class RaftConsensus;
 
 /**
  * Interprets and executes operations that have been committed into the Raft
@@ -65,7 +69,7 @@ class StateMachine {
     };
 
 
-    StateMachine(std::shared_ptr<RaftConsensus> consensus,
+    StateMachine(std::shared_ptr<Raft::RaftConsensus> consensus,
                  Core::Config& config,
                  Globals& globals);
     ~StateMachine();
@@ -156,7 +160,7 @@ class StateMachine {
     /**
      * Invoked once per committed entry from the Raft log.
      */
-    void apply(const RaftConsensus::Entry& entry);
+    void apply(const Raft::RaftConsensus::Entry& entry);
 
     /**
      * Main function for thread that waits for new commands from Raft.
@@ -265,7 +269,7 @@ class StateMachine {
      * Consensus module from which this state machine pulls commands and
      * snapshots.
      */
-    std::shared_ptr<RaftConsensus> consensus;
+    std::shared_ptr<Raft::RaftConsensus> consensus;
 
     /**
      * Server-wide globals. Used to unblock signal handlers in child process.

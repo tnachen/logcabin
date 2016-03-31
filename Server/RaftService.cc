@@ -13,11 +13,11 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
-#include "build/Protocol/Raft.pb.h"
+#include "build/Raft/Protocol/Raft.pb.h"
 #include "Core/Debug.h"
 #include "Core/ProtoBuf.h"
+#include "Raft/RaftConsensus.h"
 #include "RPC/ServerRPC.h"
-#include "Server/RaftConsensus.h"
 #include "Server/RaftService.h"
 #include "Server/Globals.h"
 
@@ -36,7 +36,7 @@ RaftService::~RaftService()
 void
 RaftService::handleRPC(RPC::ServerRPC rpc)
 {
-    using Protocol::Raft::OpCode;
+    using Raft::Protocol::OpCode;
 
     // Call the appropriate RPC handler based on the request's opCode.
     switch (rpc.getOpCode()) {
@@ -68,8 +68,8 @@ RaftService::getName() const
  * 'response' will be an empty protocol buffer for you to fill in the response.
  */
 #define PRELUDE(rpcClass) \
-    Protocol::Raft::rpcClass::Request request; \
-    Protocol::Raft::rpcClass::Response response; \
+    Raft::Protocol::rpcClass::Request request;	 \
+    Raft::Protocol::rpcClass::Response response; \
     if (!rpc.getRequest(request)) \
         return;
 

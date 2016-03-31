@@ -22,7 +22,7 @@
 #include <iostream>
 #include <string>
 
-#include "build/Server/SnapshotMetadata.pb.h"
+#include "build/Raft/SnapshotMetadata.pb.h"
 #include "build/Server/SnapshotStateMachine.pb.h"
 #include "Core/Config.h"
 #include "Core/Debug.h"
@@ -170,7 +170,7 @@ readSnapshot(Storage::Layout& storageLayout)
     }
 
     { // read header protobuf from stream
-        Server::SnapshotMetadata::Header header;
+        Raft::SnapshotMetadata::Header header;
         std::string error = reader->readMessage(header);
         if (!error.empty()) {
             PANIC("couldn't read snapshot header: %s",

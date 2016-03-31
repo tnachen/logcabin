@@ -12,9 +12,9 @@
 // ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
 // OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 
-package LogCabin.Server.SnapshotMetadata;
+package LogCabin.Raft.SnapshotMetadata;
 
-import "build/Protocol/Raft.proto";
+import "build/Raft/Protocol/Raft.proto";
 
 /**
  * Header for a snapshot file.
@@ -41,7 +41,7 @@ message Header {
      * configurations in practice) but is marked optional so as to not to bake
      * that assumption in here.
      */
-    optional Protocol.Raft.Configuration configuration = 2;
+    optional LogCabin.Raft.Protocol.Configuration configuration = 2;
 
     /**
      * The log index where 'configuration' came from. This is required iff

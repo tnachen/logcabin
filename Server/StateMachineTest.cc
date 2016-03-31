@@ -19,13 +19,14 @@
 #include <sys/stat.h>
 #include <sys/time.h>
 
-#include "build/Protocol/Raft.pb.h"
+#include "build/Raft/Protocol/Raft.pb.h"
 #include "Core/Debug.h"
 #include "Core/ProtoBuf.h"
 #include "Core/StringUtil.h"
 #include "Core/STLUtil.h"
+#include "Raft/Globals.h"
+#include "Raft/RaftConsensus.h"
 #include "Server/Globals.h"
-#include "Server/RaftConsensus.h"
 #include "Server/StateMachine.h"
 #include "Storage/FilesystemUtil.h"
 #include "Storage/MemoryLog.h"
@@ -41,21 +42,22 @@ class ServerStateMachineTest : public ::testing::Test {
   public:
     ServerStateMachineTest()
       : globals()
+      , raftGlobals()
       , consensus()
       , stateMachine()
       , timeMocker()
     {
-        RaftConsensusInternal::startThreads = false;
-        consensus.reset(new RaftConsensus(globals));
+        Raft::RaftConsensusInternal::startThreads = false;
+        consensus.reset(new Raft::RaftConsensus(raftGlobals));
         consensus->serverId = 1;
         consensus->log.reset(new Storage::MemoryLog());
         consensus->storageLayout.initTemporary();
 
         Storage::Log::Entry entry;
         entry.set_term(1);
-        entry.set_type(Protocol::Raft::EntryType::CONFIGURATION);
+        entry.set_type(Raft::Protocol::EntryType::CONFIGURATION);
         *entry.mutable_configuration() =
-            Core::ProtoBuf::fromString<Protocol::Raft::Configuration>(
+            Core::ProtoBuf::fromString<Raft::Protocol::Configuration>(
                 "prev_configuration {"
                 "    servers { server_id: 1, addresses: '127.0.0.1:5254' }"
                 "}");
@@ -84,7 +86,8 @@ class ServerStateMachineTest : public ::testing::Test {
     }
 
     Globals globals;
-    std::shared_ptr<RaftConsensus> consensus;
+    Raft::Globals raftGlobals;
+    std::shared_ptr<Raft::RaftConsensus> consensus;
     std::unique_ptr<StateMachine> stateMachine;
     Core::Time::SteadyClock::Mocker timeMocker;
 };
@@ -385,9 +388,9 @@ TEST_F(ServerStateMachineTest, setInhibit)
 TEST_F(ServerStateMachineTest, apply_tree)
 {
     stateMachine->sessionTimeoutNanos = 1;
-    RaftConsensus::Entry entry;
+    Raft::RaftConsensus::Entry entry;
     entry.index = 6;
-    entry.type = RaftConsensus::Entry::DATA;
+    entry.type = Raft::RaftConsensus::Entry::DATA;
     entry.clusterTime = 2;
     StateMachine::Command::Request command =
         Core::ProtoBuf::fromString<StateMachine::Command::Request>(
@@ -450,9 +453,9 @@ TEST_F(ServerStateMachineTest, apply_openSession)
     StateMachine::Command::Request command =
         Core::ProtoBuf::fromString<StateMachine::Command::Request>(
             "open_session: {}");
-    RaftConsensus::Entry entry;
+    Raft::RaftConsensus::Entry entry;
     entry.index = 6;
-    entry.type = RaftConsensus::Entry::DATA;
+    entry.type = Raft::RaftConsensus::Entry::DATA;
     entry.command = serialize(command);
     entry.clusterTime = 2;
 
@@ -475,9 +478,9 @@ TEST_F(ServerStateMachineTest, apply_closeSession)
     StateMachine::Command::Request command;
     command.mutable_close_session()->set_client_id(3);
 
-    RaftConsensus::Entry entry;
+    Raft::RaftConsensus::Entry entry;
     entry.index = 6;
-    entry.type = RaftConsensus::Entry::DATA;
+    entry.type = Raft::RaftConsensus::Entry::DATA;
     entry.command = serialize(command);
     entry.clusterTime = 2;
 
@@ -514,9 +517,9 @@ TEST_F(ServerStateMachineTest, apply_closeSession)
 
 TEST_F(ServerStateMachineTest, apply_advanceVersion)
 {
-    RaftConsensus::Entry entry;
+    Raft::RaftConsensus::Entry entry;
     entry.index = 6;
-    entry.type = RaftConsensus::Entry::DATA;
+    entry.type = Raft::RaftConsensus::Entry::DATA;
     entry.clusterTime = 2;
 
     // stay at version 1
@@ -552,9 +555,9 @@ TEST_F(ServerStateMachineTest, apply_unknown)
 {
     StateMachine::Command::Request command =
         Core::ProtoBuf::fromString<StateMachine::Command::Request>("");
-    RaftConsensus::Entry entry;
+    Raft::RaftConsensus::Entry entry;
     entry.index = 6;
-    entry.type = RaftConsensus::Entry::DATA;
+    entry.type = Raft::RaftConsensus::Entry::DATA;
     entry.clusterTime = 2;
     entry.command = serialize(command);
     // should be no-op, definitely shouldn't panic, expect warning
@@ -774,9 +777,9 @@ struct SnapshotThreadMainHelper {
         // return true
         Storage::Log::Entry entry;
         entry.set_term(1);
-        entry.set_type(Protocol::Raft::EntryType::CONFIGURATION);
+        entry.set_type(Raft::Protocol::EntryType::CONFIGURATION);
         *entry.mutable_configuration() =
-            Core::ProtoBuf::fromString<Protocol::Raft::Configuration>(
+            Core::ProtoBuf::fromString<Raft::Protocol::Configuration>(
                 "prev_configuration {"
                 "    servers { server_id: 1, addresses: '127.0.0.1:5254' }"
                 "}");
@@ -950,4 +953,3 @@ TEST_F(ServerStateMachineTest, takeSnapshot)
 } // namespace LogCabin::Server::<anonymous>
 } // namespace LogCabin::Server
 } // namespace LogCabin
-

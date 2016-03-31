@@ -15,10 +15,10 @@
 
 #include "Core/Debug.h"
 #include "Core/ProtoBuf.h"
-#include "Server/RaftConsensus.h"
+#include "Raft/RaftConsensus.h"
 
 namespace LogCabin {
-namespace Server {
+namespace Raft {
 namespace RaftConsensusInternal {
 
 #define expect(expr) do { \
@@ -123,7 +123,7 @@ Invariants::checkBasic()
          index >= consensus.log->getLogStartIndex();
          --index) {
         const Storage::Log::Entry& entry = consensus.log->getEntry(index);
-        if (entry.type() == Protocol::Raft::EntryType::CONFIGURATION) {
+        if (entry.type() == Raft::Protocol::EntryType::CONFIGURATION) {
             expect(consensus.configuration->id == index);
             expect(consensus.configuration->state !=
                    Configuration::State::BLANK);
@@ -147,7 +147,7 @@ Invariants::checkBasic()
          index <= consensus.log->getLastLogIndex();
          ++index) {
         const Storage::Log::Entry& entry = consensus.log->getEntry(index);
-        if (entry.type() == Protocol::Raft::EntryType::CONFIGURATION) {
+        if (entry.type() == Raft::Protocol::EntryType::CONFIGURATION) {
             auto it = consensus.configurationManager->
                                         descriptions.find(index);
             expect(it != consensus.configurationManager->descriptions.end());
@@ -302,5 +302,5 @@ Invariants::checkPeerDelta()
 
 } // namespace RaftConsensusInternal
 
-} // namespace LogCabin::Server
+} // namespace LogCabin::Raft
 } // namespace LogCabin

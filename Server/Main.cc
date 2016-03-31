@@ -24,8 +24,8 @@
 #include "Core/StringUtil.h"
 #include "Core/ThreadId.h"
 #include "Core/Util.h"
+#include "Raft/RaftConsensus.h"
 #include "Server/Globals.h"
-#include "Server/RaftConsensus.h"
 
 namespace {
 

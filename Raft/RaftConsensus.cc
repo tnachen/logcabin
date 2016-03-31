@@ -24,8 +24,9 @@
 #include <time.h>
 #include <unistd.h>
 
-#include "build/Protocol/Raft.pb.h"
-#include "build/Server/SnapshotMetadata.pb.h"
+#include "build/Raft/SnapshotMetadata.pb.h"
+#include "build/Raft/Protocol/Raft.pb.h"
+
 #include "Core/Buffer.h"
 #include "Core/Debug.h"
 #include "Core/ProtoBuf.h"
@@ -34,15 +35,15 @@
 #include "Core/ThreadId.h"
 #include "Core/Util.h"
 #include "Protocol/Common.h"
+#include "Raft/RaftConsensus.h"
+#include "Raft/Globals.h"
 #include "RPC/ClientRPC.h"
 #include "RPC/ClientSession.h"
 #include "RPC/ServerRPC.h"
-#include "Server/RaftConsensus.h"
-#include "Server/Globals.h"
 #include "Storage/LogFactory.h"
 
 namespace LogCabin {
-namespace Server {
+namespace Raft {
 
 typedef Storage::Log Log;
 
@@ -143,7 +144,7 @@ LocalServer::dumpToStream(std::ostream& os) const
 }
 
 void
-LocalServer::updatePeerStats(Protocol::ServerStats::Raft::Peer& peerStats,
+LocalServer::updatePeerStats(LogCabin::Protocol::ServerStats_Raft_Peer& peerStats,
                              Core::Time::SteadyTimeConverter& time) const
 {
     switch (consensus.state) {
@@ -263,14 +264,14 @@ Peer::scheduleHeartbeat()
 }
 
 Peer::CallStatus
-Peer::callRPC(Protocol::Raft::OpCode opCode,
+Peer::callRPC(Raft::Protocol::OpCode opCode,
               const google::protobuf::Message& request,
               google::protobuf::Message& response,
               std::unique_lock<Mutex>& lockGuard)
 {
     typedef RPC::ClientRPC::Status RPCStatus;
     rpc = RPC::ClientRPC(getSession(lockGuard),
-                         Protocol::Common::ServiceId::RAFT_SERVICE,
+                         LogCabin::Protocol::Common::ServiceId::RAFT_SERVICE,
                          /* serviceSpecificErrorVersion = */ 0,
                          opCode,
                          request);
@@ -330,7 +331,7 @@ Peer::getSession(std::unique_lock<Mutex>& lockGuard)
         TimePoint timeout = Clock::now() + consensus.ELECTION_TIMEOUT;
         // release lock for concurrency
         Core::MutexUnlock<Mutex> unlockGuard(lockGuard);
-        RPC::Address target(addresses, Protocol::Common::DEFAULT_PORT);
+        RPC::Address target(addresses, LogCabin::Protocol::Common::DEFAULT_PORT);
         target.refresh(timeout);
         Client::SessionManager::ServerId peerId(serverId);
         session = consensus.sessionManager.createSession(
@@ -372,7 +373,7 @@ Peer::dumpToStream(std::ostream& os) const
 }
 
 void
-Peer::updatePeerStats(Protocol::ServerStats::Raft::Peer& peerStats,
+Peer::updatePeerStats(LogCabin::Protocol::ServerStats_Raft_Peer& peerStats,
                       Core::Time::SteadyTimeConverter& time) const
 {
     switch (consensus.state) {
@@ -579,7 +580,7 @@ Configuration::reset()
 void
 Configuration::setConfiguration(
         uint64_t newId,
-        const Protocol::Raft::Configuration& newDescription)
+        const Raft::Protocol::Configuration& newDescription)
 {
     NOTICE("Activating configuration %lu:\n%s", newId,
            Core::ProtoBuf::dumpString(newDescription).c_str());
@@ -630,7 +631,7 @@ Configuration::setConfiguration(
 
 void
 Configuration::setStagingServers(
-        const Protocol::Raft::SimpleConfiguration& stagingServers)
+        const Raft::Protocol::SimpleConfiguration& stagingServers)
 {
     assert(state == State::STABLE);
     state = State::STAGING;
@@ -662,13 +663,13 @@ Configuration::stagingMin(const GetValue& getValue) const
 }
 
 void
-Configuration::updateServerStats(Protocol::ServerStats& serverStats,
+Configuration::updateServerStats(LogCabin::Protocol::ServerStats& serverStats,
                                  Core::Time::SteadyTimeConverter& time) const
 {
     for (auto it = knownServers.begin();
          it != knownServers.end();
          ++it) {
-        Protocol::ServerStats::Raft::Peer& peerStats =
+        LogCabin::Protocol::ServerStats_Raft_Peer& peerStats =
             *serverStats.mutable_raft()->add_peer();
         peerStats.set_server_id(it->first);
         const ServerRef& peer = it->second;
@@ -754,7 +755,7 @@ ConfigurationManager::~ConfigurationManager()
 void
 ConfigurationManager::add(
     uint64_t index,
-    const Protocol::Raft::Configuration& description)
+    const Raft::Protocol::Configuration& description)
 {
     descriptions[index] = description;
     restoreInvariants();
@@ -779,14 +780,14 @@ ConfigurationManager::truncateSuffix(uint64_t lastIndexKept)
 void
 ConfigurationManager::setSnapshot(
     uint64_t index,
-    const Protocol::Raft::Configuration& description)
+    const Raft::Protocol::Configuration& description)
 {
     assert(index >= snapshot.first);
     snapshot = {index, description};
     restoreInvariants();
 }
 
-std::pair<uint64_t, Protocol::Raft::Configuration>
+std::pair<uint64_t, Raft::Protocol::Configuration>
 ConfigurationManager::getLatestConfigurationAsOf(
                                         uint64_t lastIncludedIndex) const
 {
@@ -857,7 +858,7 @@ namespace {
 
 struct StagingProgressing {
     StagingProgressing(uint64_t epoch,
-                       Protocol::Client::SetConfiguration::Response& response)
+                       LogCabin::Protocol::Client::SetConfiguration::Response& response)
         : epoch(epoch)
         , response(response)
     {
@@ -873,7 +874,7 @@ struct StagingProgressing {
         return true;
     }
     const uint64_t epoch;
-    Protocol::Client::SetConfiguration::Response& response;
+    LogCabin::Protocol::Client::SetConfiguration::Response& response;
 };
 
 struct StateMachineVersionIntersection {
@@ -959,7 +960,7 @@ RaftConsensus::RaftConsensus(Globals& globals)
             globals.config.read<uint64_t>(
                 "stateMachineUpdaterBackoffMilliseconds",
                 10000)))
-    , SOFT_RPC_SIZE_LIMIT(Protocol::Common::MAX_MESSAGE_LENGTH - 1024)
+            , SOFT_RPC_SIZE_LIMIT(LogCabin::Protocol::Common::MAX_MESSAGE_LENGTH - 1024)
     , serverId(0)
     , serverAddresses()
     , globals(globals)
@@ -1058,12 +1059,12 @@ RaftConsensus::init()
          index <= log->getLastLogIndex();
          ++index) {
         const Log::Entry& entry = log->getEntry(index);
-        if (entry.type() == Protocol::Raft::EntryType::UNKNOWN) {
+        if (entry.type() == Raft::Protocol::EntryType::UNKNOWN) {
             PANIC("Don't understand the entry type for index %lu (term %lu) "
                   "found on disk",
                   index, entry.term());
         }
-        if (entry.type() == Protocol::Raft::EntryType::CONFIGURATION) {
+        if (entry.type() == Raft::Protocol::EntryType::CONFIGURATION) {
             configurationManager->add(index, entry.configuration());
         }
     }
@@ -1144,11 +1145,11 @@ RaftConsensus::bootstrapConfiguration()
     // Append the configuration entry to the log
     Log::Entry entry;
     entry.set_term(1);
-    entry.set_type(Protocol::Raft::EntryType::CONFIGURATION);
+    entry.set_type(Raft::Protocol::EntryType::CONFIGURATION);
     entry.set_cluster_time(0);
-    Protocol::Raft::Configuration& configuration =
+    Raft::Protocol::Configuration& configuration =
         *entry.mutable_configuration();
-    Protocol::Raft::Server& server =
+    Raft::Protocol::Server& server =
         *configuration.mutable_prev_configuration()->add_servers();
     server.set_server_id(serverId);
     server.set_addresses(serverAddresses);
@@ -1157,7 +1158,7 @@ RaftConsensus::bootstrapConfiguration()
 
 RaftConsensus::ClientResult
 RaftConsensus::getConfiguration(
-        Protocol::Raft::SimpleConfiguration& currentConfiguration,
+        Raft::Protocol::SimpleConfiguration& currentConfiguration,
         uint64_t& id) const
 {
     std::unique_lock<Mutex> lockGuard(mutex);
@@ -1189,7 +1190,7 @@ RaftConsensus::getLeaderHint() const
     return configuration->lookupAddress(leaderId);
 }
 
-RaftConsensus::Entry
+Raft::RaftConsensus::Entry
 RaftConsensus::getNextEntry(uint64_t lastIndex) const
 {
     std::unique_lock<Mutex> lockGuard(mutex);
@@ -1226,7 +1227,7 @@ RaftConsensus::getNextEntry(uint64_t lastIndex) const
                 // not a snapshot
                 const Log::Entry& logEntry = log->getEntry(nextIndex);
                 entry.index = nextIndex;
-                if (logEntry.type() == Protocol::Raft::EntryType::DATA) {
+                if (logEntry.type() == Raft::Protocol::EntryType::DATA) {
                     entry.type = Entry::DATA;
                     const std::string& s = logEntry.data();
                     entry.command = Core::Buffer(
@@ -1261,8 +1262,8 @@ RaftConsensus::getSnapshotStats() const
 
 void
 RaftConsensus::handleAppendEntries(
-                    const Protocol::Raft::AppendEntries::Request& request,
-                    Protocol::Raft::AppendEntries::Response& response)
+                    const Raft::Protocol::AppendEntries::Request& request,
+                    Raft::Protocol::AppendEntries::Response& response)
 {
     std::lock_guard<Mutex> lockGuard(mutex);
     assert(!exiting);
@@ -1358,7 +1359,7 @@ RaftConsensus::handleAppendEntries(
          it != request.entries().end();
          ++it) {
         ++index;
-        const Protocol::Raft::Entry& entry = *it;
+        const Raft::Protocol::Entry& entry = *it;
         if (entry.has_index()) {
             // This precaution was added after #160: "Packing entries into
             // AppendEntries requests is broken (critical)".
@@ -1385,10 +1386,10 @@ RaftConsensus::handleAppendEntries(
         }
 
         // Append this and all following entries.
-        std::vector<const Protocol::Raft::Entry*> entries;
+        std::vector<const Raft::Protocol::Entry*> entries;
         do {
-            const Protocol::Raft::Entry& entry = *it;
-            if (entry.type() == Protocol::Raft::EntryType::UNKNOWN) {
+            const Raft::Protocol::Entry& entry = *it;
+            if (entry.type() == Raft::Protocol::EntryType::UNKNOWN) {
                 PANIC("Leader %lu is trying to send us an unknown log entry "
                       "type for index %lu (term %lu). It shouldn't do that, "
                       "and there's not a good way forward. There's some hope "
@@ -1428,8 +1429,8 @@ RaftConsensus::handleAppendEntries(
 
 void
 RaftConsensus::handleInstallSnapshot(
-        const Protocol::Raft::InstallSnapshot::Request& request,
-        Protocol::Raft::InstallSnapshot::Response& response)
+        const Raft::Protocol::InstallSnapshot::Request& request,
+        Raft::Protocol::InstallSnapshot::Response& response)
 {
     std::lock_guard<Mutex> lockGuard(mutex);
     assert(!exiting);
@@ -1524,8 +1525,8 @@ RaftConsensus::handleInstallSnapshot(
 
 void
 RaftConsensus::handleRequestVote(
-                    const Protocol::Raft::RequestVote::Request& request,
-                    Protocol::Raft::RequestVote::Response& response)
+                    const Raft::Protocol::RequestVote::Request& request,
+                    Raft::Protocol::RequestVote::Response& response)
 {
     std::lock_guard<Mutex> lockGuard(mutex);
     assert(!exiting);
@@ -1586,15 +1587,15 @@ RaftConsensus::replicate(const Core::Buffer& operation)
 {
     std::unique_lock<Mutex> lockGuard(mutex);
     Log::Entry entry;
-    entry.set_type(Protocol::Raft::EntryType::DATA);
+    entry.set_type(Raft::Protocol::EntryType::DATA);
     entry.set_data(operation.getData(), operation.getLength());
     return replicateEntry(entry, lockGuard);
 }
 
 RaftConsensus::ClientResult
 RaftConsensus::setConfiguration(
-        const Protocol::Client::SetConfiguration::Request& request,
-        Protocol::Client::SetConfiguration::Response& response)
+      const LogCabin::Protocol::Client::SetConfiguration::Request& request,
+      LogCabin::Protocol::Client::SetConfiguration::Response& response)
 {
     std::unique_lock<Mutex> lockGuard(mutex);
 
@@ -1626,13 +1627,13 @@ RaftConsensus::setConfiguration(
            configuration->id);
 
     // Set the staging servers in the configuration.
-    Protocol::Raft::SimpleConfiguration nextConfiguration;
+    Raft::Protocol::SimpleConfiguration nextConfiguration;
     for (auto it = request.new_servers().begin();
          it != request.new_servers().end();
          ++it) {
         NOTICE("Adding server %lu at %s to staging servers",
                it->server_id(), it->addresses().c_str());
-        Protocol::Raft::Server* s = nextConfiguration.add_servers();
+        Raft::Protocol::Server* s = nextConfiguration.add_servers();
         s->set_server_id(it->server_id());
         s->set_addresses(it->addresses());
     }
@@ -1676,12 +1677,12 @@ RaftConsensus::setConfiguration(
 
     // Write and commit transitional configuration
     NOTICE("Writing transitional configuration entry");
-    Protocol::Raft::Configuration newConfiguration;
+    Raft::Protocol::Configuration newConfiguration;
     *newConfiguration.mutable_prev_configuration() =
         configuration->description.prev_configuration();
     *newConfiguration.mutable_next_configuration() = nextConfiguration;
     Log::Entry entry;
-    entry.set_type(Protocol::Raft::EntryType::CONFIGURATION);
+    entry.set_type(Raft::Protocol::EntryType::CONFIGURATION);
     *entry.mutable_configuration() = newConfiguration;
     std::pair<ClientResult, uint64_t> result =
         replicateEntry(entry, lockGuard);
@@ -1795,7 +1796,7 @@ RaftConsensus::beginSnapshot(uint64_t lastIncludedIndex)
     }
 
     // Copy the configuration as of lastIncludedIndex to the header.
-    std::pair<uint64_t, Protocol::Raft::Configuration> c =
+    std::pair<uint64_t, Raft::Protocol::Configuration> c =
         configurationManager->getLatestConfigurationAsOf(lastIncludedIndex);
     if (c.first == 0) {
         WARNING("Taking snapshot with no configuration. "
@@ -1841,7 +1842,7 @@ RaftConsensus::snapshotDone(
 
     // It's easier to grab this configuration out of the manager again than to
     // carry it around after writing the header.
-    std::pair<uint64_t, Protocol::Raft::Configuration> c =
+    std::pair<uint64_t, Raft::Protocol::Configuration> c =
         configurationManager->getLatestConfigurationAsOf(lastIncludedIndex);
     if (c.first == 0) {
         WARNING("Could not find the latest configuration as of index %lu "
@@ -1862,23 +1863,23 @@ RaftConsensus::snapshotDone(
 }
 
 void
-RaftConsensus::updateServerStats(Protocol::ServerStats& serverStats) const
+RaftConsensus::updateServerStats(LogCabin::Protocol::ServerStats& serverStats) const
 {
     std::lock_guard<Mutex> lockGuard(mutex);
     Core::Time::SteadyTimeConverter time;
     serverStats.clear_raft();
-    Protocol::ServerStats::Raft& raftStats = *serverStats.mutable_raft();
+    LogCabin::Protocol::ServerStats::Raft& raftStats = *serverStats.mutable_raft();
 
     raftStats.set_current_term(currentTerm);
     switch (state) {
         case State::FOLLOWER:
-            raftStats.set_state(Protocol::ServerStats::Raft::FOLLOWER);
+            raftStats.set_state(LogCabin::Protocol::ServerStats::Raft::FOLLOWER);
             break;
         case State::CANDIDATE:
-            raftStats.set_state(Protocol::ServerStats::Raft::CANDIDATE);
+            raftStats.set_state(LogCabin::Protocol::ServerStats::Raft::CANDIDATE);
             break;
         case State::LEADER:
-            raftStats.set_state(Protocol::ServerStats::Raft::LEADER);
+            raftStats.set_state(LogCabin::Protocol::ServerStats::Raft::LEADER);
             break;
     }
     raftStats.set_commit_index(commitIndex);
@@ -1976,9 +1977,9 @@ RaftConsensus::stateMachineUpdaterThreadMain()
                                s.maxVersion);
                         Log::Entry entry;
                         entry.set_term(currentTerm);
-                        entry.set_type(Protocol::Raft::EntryType::DATA);
+                        entry.set_type(Raft::Protocol::EntryType::DATA);
                         entry.set_cluster_time(clusterClock.leaderStamp());
-                        Protocol::Client::StateMachineCommand::Request command;
+                        LogCabin::Protocol::Client::StateMachineCommand::Request command;
                         command.mutable_advance_version()->
                             set_requested_version(s.maxVersion);
                         Core::Buffer cmdBuf;
@@ -2212,7 +2213,7 @@ RaftConsensus::advanceCommitIndex()
         if (configuration->state == Configuration::State::TRANSITIONAL) {
             Log::Entry entry;
             entry.set_term(currentTerm);
-            entry.set_type(Protocol::Raft::EntryType::CONFIGURATION);
+            entry.set_type(Raft::Protocol::EntryType::CONFIGURATION);
             entry.set_cluster_time(clusterClock.leaderStamp());
             *entry.mutable_configuration()->mutable_prev_configuration() =
                 configuration->description.next_configuration();
@@ -2238,7 +2239,7 @@ RaftConsensus::append(const std::vector<const Log::Entry*>& entries)
     uint64_t index = range.first;
     for (auto it = entries.begin(); it != entries.end(); ++it) {
         const Log::Entry& entry = **it;
-        if (entry.type() == Protocol::Raft::EntryType::CONFIGURATION)
+        if (entry.type() == Raft::Protocol::EntryType::CONFIGURATION)
             configurationManager->add(index, entry.configuration());
         ++index;
     }
@@ -2274,7 +2275,7 @@ RaftConsensus::appendEntries(std::unique_lock<Mutex>& lockGuard,
     }
 
     // Build up request
-    Protocol::Raft::AppendEntries::Request request;
+    Raft::Protocol::AppendEntries::Request request;
     request.set_server_id(serverId);
     request.set_term(currentTerm);
     request.set_prev_log_term(prevLogTerm);
@@ -2285,11 +2286,11 @@ RaftConsensus::appendEntries(std::unique_lock<Mutex>& lockGuard,
     request.set_commit_index(std::min(commitIndex, prevLogIndex + numEntries));
 
     // Execute RPC
-    Protocol::Raft::AppendEntries::Response response;
+    Raft::Protocol::AppendEntries::Response response;
     TimePoint start = Clock::now();
     uint64_t epoch = currentEpoch;
     Peer::CallStatus status = peer.callRPC(
-                Protocol::Raft::OpCode::APPEND_ENTRIES,
+                Raft::Protocol::OpCode::APPEND_ENTRIES,
                 request, response,
                 lockGuard);
     switch (status) {
@@ -2388,7 +2389,7 @@ RaftConsensus::installSnapshot(std::unique_lock<Mutex>& lockGuard,
                                Peer& peer)
 {
     // Build up request
-    Protocol::Raft::InstallSnapshot::Request request;
+    Raft::Protocol::InstallSnapshot::Request request;
     request.set_server_id(serverId);
     request.set_term(currentTerm);
     request.set_version(2);
@@ -2424,11 +2425,11 @@ RaftConsensus::installSnapshot(std::unique_lock<Mutex>& lockGuard,
                      peer.snapshotFile->getFileLength());
 
     // Execute RPC
-    Protocol::Raft::InstallSnapshot::Response response;
+    Raft::Protocol::InstallSnapshot::Response response;
     TimePoint start = Clock::now();
     uint64_t epoch = currentEpoch;
     Peer::CallStatus status = peer.callRPC(
-                Protocol::Raft::OpCode::INSTALL_SNAPSHOT,
+                Raft::Protocol::OpCode::INSTALL_SNAPSHOT,
                 request, response,
                 lockGuard);
     switch (status) {
@@ -2519,7 +2520,7 @@ RaftConsensus::becomeLeader()
     // is up-to-date).
     Log::Entry entry;
     entry.set_term(currentTerm);
-    entry.set_type(Protocol::Raft::EntryType::NOOP);
+    entry.set_type(Raft::Protocol::EntryType::NOOP);
     entry.set_cluster_time(clusterClock.leaderStamp());
     append({&entry});
 
@@ -2570,7 +2571,7 @@ RaftConsensus::interruptAll()
 uint64_t
 RaftConsensus::packEntries(
         uint64_t nextIndex,
-        Protocol::Raft::AppendEntries::Request& request) const
+        Raft::Protocol::AppendEntries::Request& request) const
 {
     // Add as many as entries as will fit comfortably in the request. It's
     // easiest to add one entry at a time until the RPC gets too big, then back
@@ -2594,7 +2595,7 @@ RaftConsensus::packEntries(
     using Core::Util::downCast;
     uint64_t lastIndex = std::min(log->getLastLogIndex(),
                                   nextIndex + MAX_LOG_ENTRIES_PER_REQUEST - 1);
-    google::protobuf::RepeatedPtrField<Protocol::Raft::Entry>& requestEntries =
+    google::protobuf::RepeatedPtrField<Raft::Protocol::Entry>& requestEntries =
         *request.mutable_entries();
 
     uint64_t numEntries = 0;
@@ -2761,18 +2762,18 @@ RaftConsensus::replicateEntry(Log::Entry& entry,
 void
 RaftConsensus::requestVote(std::unique_lock<Mutex>& lockGuard, Peer& peer)
 {
-    Protocol::Raft::RequestVote::Request request;
+    Raft::Protocol::RequestVote::Request request;
     request.set_server_id(serverId);
     request.set_term(currentTerm);
     request.set_last_log_term(getLastLogTerm());
     request.set_last_log_index(log->getLastLogIndex());
 
-    Protocol::Raft::RequestVote::Response response;
+    Raft::Protocol::RequestVote::Response response;
     VERBOSE("requestVote start");
     TimePoint start = Clock::now();
     uint64_t epoch = currentEpoch;
     Peer::CallStatus status = peer.callRPC(
-                Protocol::Raft::OpCode::REQUEST_VOTE,
+                Raft::Protocol::OpCode::REQUEST_VOTE,
                 request, response,
                 lockGuard);
     VERBOSE("requestVote done");
@@ -3026,5 +3027,5 @@ operator<<(std::ostream& os, RaftConsensus::State state)
     return os;
 }
 
-} // namespace LogCabin::Server
+} // namespace LogCabin::Raft
 } // namespace LogCabin

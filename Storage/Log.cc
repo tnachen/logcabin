@@ -20,7 +20,7 @@
 #include <unistd.h>
 
 #include "build/Protocol/Client.pb.h"
-#include "build/Protocol/Raft.pb.h"
+#include "build/Raft/Protocol/Raft.pb.h"
 #include "Core/Debug.h"
 #include "Core/ProtoBuf.h"
 #include "Storage/Log.h"
@@ -65,7 +65,7 @@ operator<<(std::ostream& os, const Log& log)
          ++i) {
         os << "Entry " << i << " start:" << std::endl;
         Log::Entry e = log.getEntry(i);
-        if (e.type() == Protocol::Raft::EntryType::DATA) {
+        if (e.type() == Raft::Protocol::EntryType::DATA) {
             std::string data = e.data();
             Core::Buffer buffer(const_cast<char*>(data.data()),
                                 data.length(), NULL);

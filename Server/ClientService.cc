@@ -21,7 +21,7 @@
 #include "Core/ProtoBuf.h"
 #include "Core/Time.h"
 #include "RPC/ServerRPC.h"
-#include "Server/RaftConsensus.h"
+#include "Raft/RaftConsensus.h"
 #include "Server/ClientService.h"
 #include "Server/Globals.h"
 #include "Server/StateMachine.h"
@@ -29,7 +29,7 @@
 namespace LogCabin {
 namespace Server {
 
-typedef RaftConsensus::ClientResult Result;
+typedef LogCabin::Raft::RaftConsensus::ClientResult Result;
 
 ClientService::ClientService(Globals& globals)
     : globals(globals)
@@ -108,7 +108,7 @@ void
 ClientService::getConfiguration(RPC::ServerRPC rpc)
 {
     PRELUDE(GetConfiguration);
-    Protocol::Raft::SimpleConfiguration configuration;
+    Raft::Protocol::SimpleConfiguration configuration;
     uint64_t id;
     Result result = globals.raft->getConfiguration(configuration, id);
     if (result == Result::RETRY || result == Result::NOT_LEADER) {

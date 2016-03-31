@@ -24,8 +24,8 @@
 #include "Core/Random.h"
 #include "Core/ThreadId.h"
 #include "Core/Util.h"
+#include "Raft/RaftConsensus.h"
 #include "Server/Globals.h"
-#include "Server/RaftConsensus.h"
 #include "Server/StateMachine.h"
 #include "Storage/SnapshotFile.h"
 #include "Tree/ProtoBuf.h"
@@ -34,13 +34,14 @@ namespace LogCabin {
 namespace Server {
 
 namespace PC = LogCabin::Protocol::Client;
+namespace RC = LogCabin::Raft;
 
 
 // for testing purposes
 bool stateMachineSuppressThreads = false;
 uint32_t stateMachineChildSleepMs = 0;
 
-StateMachine::StateMachine(std::shared_ptr<RaftConsensus> consensus,
+StateMachine::StateMachine(std::shared_ptr<RC::RaftConsensus> consensus,
                            Core::Config& config,
                            Globals& globals)
     : consensus(consensus)
@@ -298,7 +299,7 @@ StateMachine::setInhibit(std::chrono::nanoseconds duration)
 ////////// StateMachine private methods //////////
 
 void
-StateMachine::apply(const RaftConsensus::Entry& entry)
+StateMachine::apply(const RC::RaftConsensus::Entry& entry)
 {
     Command::Request command;
     if (!Core::ProtoBuf::parse(entry.command, command)) {
@@ -388,15 +389,15 @@ StateMachine::applyThreadMain()
     Core::ThreadId::setName("StateMachine");
     try {
         while (true) {
-            RaftConsensus::Entry entry = consensus->getNextEntry(lastApplied);
+            RC::RaftConsensus::Entry entry = consensus->getNextEntry(lastApplied);
             std::lock_guard<Core::Mutex> lockGuard(mutex);
             switch (entry.type) {
-                case RaftConsensus::Entry::SKIP:
+                case RC::RaftConsensus::Entry::SKIP:
                     break;
-                case RaftConsensus::Entry::DATA:
+                case RC::RaftConsensus::Entry::DATA:
                     apply(entry);
                     break;
-                case RaftConsensus::Entry::SNAPSHOT:
+                case RC::RaftConsensus::Entry::SNAPSHOT:
                     NOTICE("Loading snapshot through entry %lu into state "
                            "machine", entry.index);
                     loadSnapshot(*entry.snapshotReader);
@@ -592,7 +593,7 @@ StateMachine::serializeVersionHistory(
 bool
 StateMachine::shouldTakeSnapshot(uint64_t lastIncludedIndex) const
 {
-    SnapshotStats::SnapshotStats stats = consensus->getSnapshotStats();
+    Raft::SnapshotStats::SnapshotStats stats = consensus->getSnapshotStats();
 
     // print every 10% but not at 100% because then we'd be printing all the
     // time
