@@ -18,14 +18,13 @@
 #include "Core/ProtoBuf.h"
 #include "Raft/RaftConsensus.h"
 #include "RPC/ServerRPC.h"
-#include "Server/RaftService.h"
-#include "Server/Globals.h"
+#include "Raft/RaftService.h"
 
 namespace LogCabin {
-namespace Server {
+namespace Raft {
 
-RaftService::RaftService(Globals& globals)
-    : globals(globals)
+RaftService::RaftService(std::shared_ptr<RaftConsensus> raft)
+    : raft(raft)
 {
 }
 
@@ -81,7 +80,7 @@ RaftService::appendEntries(RPC::ServerRPC rpc)
     PRELUDE(AppendEntries);
     //VERBOSE("AppendEntries:\n%s",
     //        Core::ProtoBuf::dumpString(request).c_str());
-    globals.raft->handleAppendEntries(request, response);
+    raft->handleAppendEntries(request, response);
     rpc.reply(response);
 }
 
@@ -91,7 +90,7 @@ RaftService::installSnapshot(RPC::ServerRPC rpc)
     PRELUDE(InstallSnapshot);
     //VERBOSE("InstallSnapshot:\n%s",
     //        Core::ProtoBuf::dumpString(request).c_str());
-    globals.raft->handleInstallSnapshot(request, response);
+    raft->handleInstallSnapshot(request, response);
     rpc.reply(response);
 }
 
@@ -101,7 +100,7 @@ RaftService::requestVote(RPC::ServerRPC rpc)
     PRELUDE(RequestVote);
     //VERBOSE("RequestVote:\n%s",
     //        Core::ProtoBuf::dumpString(request).c_str());
-    globals.raft->handleRequestVote(request, response);
+    raft->handleRequestVote(request, response);
     rpc.reply(response);
 }
 

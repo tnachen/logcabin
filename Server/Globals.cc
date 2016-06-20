@@ -24,7 +24,6 @@
 #include "Server/ClientService.h"
 #include "Server/ControlService.h"
 #include "Server/Globals.h"
-#include "Server/RaftService.h"
 #include "Server/StateMachine.h"
 
 namespace LogCabin {
@@ -116,10 +115,6 @@ Globals::init()
         controlService.reset(new ControlService(*this));
     }
 
-    if (!raftService) {
-        raftService.reset(new RaftService(*this));
-    }
-
     if (!clientService) {
         clientService.reset(new ClientService(*this));
     }
@@ -133,9 +128,6 @@ Globals::init()
         rpcServer->registerService(ServiceId::CONTROL_SERVICE,
                                    controlService,
                                    maxThreads);
-        rpcServer->registerService(ServiceId::RAFT_SERVICE,
-                                   raftService,
-                                   maxThreads);
         rpcServer->registerService(ServiceId::CLIENT_SERVICE,
                                    clientService,
                                    maxThreads);
@@ -147,27 +139,6 @@ Globals::init()
             serverStatsLock->set_server_id(serverId);
             serverStatsLock->set_addresses(listenAddressesStr);
         }
-        std::vector<std::string> listenAddresses =
-            Core::StringUtil::split(listenAddressesStr, ',');
-        if (listenAddresses.empty()) {
-            EXIT("No server addresses specified to listen on");
-        }
-        for (auto it = listenAddresses.begin();
-             it != listenAddresses.end();
-             ++it) {
-            RPC::Address address(*it, Protocol::Common::DEFAULT_PORT);
-            address.refresh(RPC::Address::TimePoint::max());
-            std::string error = rpcServer->bind(address);
-            if (!error.empty()) {
-                EXIT("Could not listen on address %s: %s",
-                     address.toString().c_str(),
-                     error.c_str());
-            }
-            NOTICE("Serving on %s",
-                   address.toString().c_str());
-        }
-        raft->serverAddresses = listenAddressesStr;
-        raft->init();
     }
 
     if (!stateMachine) {

@@ -15,20 +15,21 @@
 
 #include "RPC/Service.h"
 
-#ifndef LOGCABIN_SERVER_RAFTSERVICE_H
-#define LOGCABIN_SERVER_RAFTSERVICE_H
+#ifndef LOGCABIN_RAFT_RAFTSERVICE_H
+#define LOGCABIN_RAFT_RAFTSERVICE_H
 
 namespace LogCabin {
-namespace Server {
+namespace Raft {
 
 // forward declaration
 class Globals;
+class RaftConsensus;
 
 // TODO(ongaro): doc
 class RaftService : public RPC::Service {
   public:
     /// Constructor.
-    explicit RaftService(Globals& globals);
+    explicit RaftService(std::shared_ptr<RaftConsensus> raft);
 
     /// Destructor.
     ~RaftService();
@@ -44,11 +45,7 @@ class RaftService : public RPC::Service {
     void appendEntries(RPC::ServerRPC rpc);
     void installSnapshot(RPC::ServerRPC rpc);
 
-    /**
-     * The LogCabin daemon's top-level objects.
-     */
-    Globals& globals;
-
+    std::shared_ptr<RaftConsensus> raft;
   public:
 
     // RaftService is non-copyable.
@@ -56,7 +53,7 @@ class RaftService : public RPC::Service {
     RaftService& operator=(const RaftService&) = delete;
 }; // class RaftService
 
-} // namespace LogCabin::Server
+} // namespace LogCabin::RAFT
 } // namespace LogCabin
 
-#endif /* LOGCABIN_SERVER_RAFTSERVICE_H */
+#endif /* LOGCABIN_RAFT_RAFTSERVICE_H */
